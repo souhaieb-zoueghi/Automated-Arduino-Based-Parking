@@ -26,9 +26,9 @@
 #define MAXIMUM_DISTANCE_TO_OPEN_BARRIER 9
 #define WAITING_TIME 4
 
-typedef enum {PARKING_FULL = 0, PARKING_AVAILABLE, DISPLAY_TIME_TEMP, VERIFY_ENTRANCE, VERIFY_PARKING_STATUS, SAVE_EARNINGS}ParkingStatus; 
+enum ParkingStatus{PARKING_FULL = 0, PARKING_AVAILABLE, DISPLAY_TIME_TEMP, VERIFY_ENTRANCE, VERIFY_PARKING_STATUS, SAVE_EARNINGS};
 
-//get number of cars that got out of the parking from the slave to calculate the right current cars number in the parking 
+//get number of cars that got out of the parking from the slave to calculate the right current cars number in the parking
 int getNumberOfCarsOut();
 
 //display temperature on the LCD
@@ -47,27 +47,24 @@ int getDistance();
 void informSlave(ParkingStatus);
 
 //Ultrasonic pins
-const int pingPin = 9; 
-const int echoPin = 6; 
+const int pingPin = 9;
+const int echoPin = 6;
 
 //Button pin to make sure that the car entered the parking
-const int switchPin = 8; 
+const int switchPin = 8;
 
 //chip select pin for the SD card
-const int csPin = 10; 
-
-//current cars number in the parking
-int currentCarsNumberIn = 0;
-
-//total cars number that entered the parking today 
-int totalCarsNumber = 0;
-
-int earning = 0;
-char statistics[STATISTICS_SIZE] = {0};
+const int csPin = 10;
 
 const char* change = "Dinar";
 
 const char* fileName = "stats.txt";
+
+//current cars number in the parking
+int currentCarsNumberIn = 0;
+
+//total cars number that entered the parking today
+int totalCarsNumber = 0;
 
 bool endOfDay = true;
 bool carEntered = false;
@@ -84,7 +81,7 @@ File myFile;
 ParkingStatus parkingStatus = DISPLAY_TIME_TEMP;
 
 void setup() {
-  
+
   //pins configuration
   pinMode(pingPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -100,10 +97,11 @@ void setup() {
 
     Serial.println("SD card is ready to use.");
     sdCardIntialized = true;
+
   }else{
 
     Serial.println("SD card initialization failed");
-    
+
   }
 
   //DS1621 configuration (temperature mode)
@@ -124,7 +122,6 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
 
   switch(parkingStatus){
 
@@ -146,7 +143,7 @@ void loop() {
 
         case VERIFY_ENTRANCE :
 
-          if (getDistance() <= MAXIMUM_DISTANCE_TO_OPEN_BARRIER) 
+          if (getDistance() <= MAXIMUM_DISTANCE_TO_OPEN_BARRIER)
             parkingStatus = VERIFY_PARKING_STATUS;
           else
             parkingStatus = DISPLAY_TIME_TEMP;
@@ -157,7 +154,7 @@ void loop() {
 
           currentCarsNumberIn = currentCarsNumberIn - getNumberOfCarsOut();
 
-          if (currentCarsNumberIn >= PARKING_MAX_CAPACITY) 
+          if (currentCarsNumberIn >= PARKING_MAX_CAPACITY)
             parkingStatus = PARKING_FULL;
           else
             parkingStatus = PARKING_AVAILABLE;
@@ -187,15 +184,15 @@ void loop() {
           now = rtc.now();
           int startedWaitingAt = now.second();
 
-          if(startedWaitingAt >= 56){
+          if(startedWaitingAt >= 60 - WAITING_TIME){
 
-            while(now.second() >= (startedWaitingAt + (60 - WAITING_TIME)) % 60){
-              
+            while(now.second() >= (startedWaitingAt + WAITING_TIME) % 60 ){
+
               displayTime();
               if(digitalRead(switchPin))
                 carEntered = true;
             }
-            
+
           }else{
 
             while(now.second() <= (startedWaitingAt + WAITING_TIME)){
@@ -224,17 +221,17 @@ void loop() {
           case SAVE_EARNINGS :
 
             if(sdCardIntialized){
-              
+
               myFile = SD.open(fileName, FILE_WRITE);
 
+              char statistics[STATISTICS_SIZE] = {0};
               sprintf(statistics, "Today %d/%d/%d you have earned %d %s\n", now.year(), now.month(),
               now.day(), totalCarsNumber * PARKING_COST, change);
               myFile.print(statistics);
               myFile.close();
-              memset(statistics, 0, STATISTICS_SIZE); 
               endOfDay = false;
               totalCarsNumber = 0;
-              
+
             }
 
             parkingStatus = DISPLAY_TIME_TEMP;
@@ -313,7 +310,6 @@ void displayTime(){
   }
 }
 
-//Calcul du distance grace a l'ultrason
 int getDistance(){
 
   digitalWrite(pingPin, HIGH);
@@ -336,30 +332,30 @@ int getNumberOfCarsOut(){
 
 float getTemperature(){
 
-//Debut de mesure de température du DS1621
+  //begin sensing temperature
   Wire.beginTransmission(DS1621_ADDR);
   Wire.write(DS1621_BEGIN_SENSING);
   Wire.endTransmission();
 
   delay(800);
 
-  //Lecture du température du DS1621
+  //specification of the address that we want to read from
   Wire.beginTransmission(DS1621_ADDR);
   Wire.write(DS1621_TEMP_REGISTRE);
-  Wire.endTransmission(false);            //pour utiliser un repeeted start
+  Wire.endTransmission(false);
 
-//on commence la lecture a partir de l'adresse 0xAA
+  //begin reading data
   Wire.requestFrom(DS1621_ADDR, 2);
   char temperatureFirstByte = Wire.read();
   char temperatureSecondByte = Wire.read();
   Wire.endTransmission();
-  
+
   float temp = temperatureFirstByte;
   if(temperatureSecondByte)
      temp += 0.5;
-     
+
   return temp;
-  
+
 }
 
 void displayTemperature(float temp){
@@ -372,9 +368,9 @@ void displayTemperature(float temp){
 }
 
 void informSlave(ParkingStatus parkingstatus){
-  
+
   Wire.beginTransmission(ARDUINO_SLAVE_ADDR);
   Wire.write(parkingstatus);
   Wire.endTransmission();
-    
+
 }
